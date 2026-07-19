@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>일본 카드 트래커</title>
+<style>
+  :root{
+    --ink:#182338;
+    --ink-soft:#5a6478;
+    --paper:#f2f4f7;
+    --card-bg:#ffffff;
+    --line:#e2e6ec;
+    --accent:#e8442e;
+    --good:#0f8a4b;
+    --warn:#c77700;
+    --bad:#c92a1a;
+    --c-tlog:#0dbdaa;   /* 트래블로그 민트 */
+    --c-twallet:#1a46e5;/* 트래블월렛 블루 */
+    --c-toss:#0064ff;   /* 토스 블루 */
+    --c-naver:#03c75a;  /* 네이버 그린 */
+    --c-nh:#6b3fa0;     /* NH 일본여행중 (JCB) */
+    --c-cash:#b0821a;   /* 현금 */
+    --radius:14px;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    background:var(--paper);color:var(--ink);
+    max-width:520px;margin:0 auto;padding:0 14px 90px;
+  }
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+
+  /* ── 헤더 ── */
+  header{display:flex;align-items:baseline;justify-content:space-between;padding:18px 2px 10px}
+  header h1{font-size:1.15rem;font-weight:800;letter-spacing:-.02em}
+  header h1 .jp{color:var(--accent);font-weight:800}
+  #btnSettings{border:0;background:none;color:var(--ink-soft);font-size:.85rem;padding:6px 8px;border-radius:8px;cursor:pointer}
+  #btnSettings:active{background:var(--line)}
+
+  section{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .sec-title{font-size:.78rem;font-weight:700;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:10px}
+
+  /* ── 금액 입력 ── */
+  .amount-row{display:flex;align-items:center;gap:8px}
+  .yen-mark{font-size:1.6rem;font-weight:800;color:var(--ink-soft)}
+  #amount{
+    flex:1;border:0;outline:0;background:transparent;
+    font-size:2.4rem;font-weight:800;letter-spacing:-.02em;color:var(--ink);
+    width:100%;min-width:0;
+  }
+  #amount::placeholder{color:#c6ccd6}
+  #krwHint{font-size:.82rem;color:var(--ink-soft);margin-top:2px;min-height:1.1em}
+  .chips{display:flex;gap:8px;margin-top:12px}
+  .chips button{
+    flex:1;padding:11px 0;border-radius:10px;border:1px solid var(--line);
+    background:#f7f8fa;font-size:.92rem;font-weight:700;color:var(--ink);cursor:pointer;
+  }
+  .chips button:active{background:var(--line)}
+  .chips .clear{flex:.6;color:var(--bad);background:#fdf1ef;border-color:#f3d5d0}
+
+  /* ── 유형 토글 ── */
+  .seg{display:flex;background:#eceff3;border-radius:11px;padding:4px;margin:14px 0 12px}
+  .seg button{
+    flex:1;padding:10px 0;border:0;border-radius:8px;background:transparent;
+    font-size:.95rem;font-weight:700;color:var(--ink-soft);cursor:pointer;transition:all .15s;
+  }
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(20,30,50,.12)}
+
+  /* ── 카드 선택 (실물 카드 모양) ── */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .cardbtn{
+    position:relative;border:0;border-radius:12px;cursor:pointer;
+    min-height:82px;padding:11px 13px;text-align:left;color:#fff;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 3px 8px rgba(20,30,50,.18);
+    display:flex;flex-direction:column;justify-content:space-between;
+    outline:3px solid transparent;outline-offset:3px;
+    transition:outline-color .12s, transform .12s;
+  }
+  /* 트래블로그: 민트 플레이트 */
+  .cardbtn.tlog{background:linear-gradient(155deg,#4ee0cf 0%,#0dbdaa 55%,#009286 100%)}
+  /* 트래블월렛: 화이트 플레이트 + 블루 로고 */
+  .cardbtn.twallet{
+    background:linear-gradient(155deg,#ffffff 0%,#f0f3fa 100%);color:#1a46e5;
+    box-shadow:inset 0 0 0 1.5px #d9dfec, 0 3px 8px rgba(20,30,50,.12);
+  }
+  .cardbtn.twallet .nm{text-shadow:none}
+  /* 토스뱅크: 토스 블루 */
+  .cardbtn.toss{background:linear-gradient(155deg,#4a9aff 0%,#0064ff 55%,#004fd0 100%)}
+  /* 네이버페이: 그린 그라데이션 */
+  .cardbtn.naver{background:linear-gradient(155deg,#37e08b 0%,#03c75a 55%,#02a34a 100%)}
+  /* NH 일본여행중: JCB 퍼플 */
+  .cardbtn.nh{background:linear-gradient(155deg,#a77ce6 0%,#6b3fa0 55%,#4a2a74 100%)}
+
+  .cardbtn .chip{
+    width:27px;height:19px;border-radius:4px;position:relative;
+    background:linear-gradient(135deg,#f5da85,#d9a83c);
+    box-shadow:inset 0 0 0 1px rgba(120,80,0,.35);
+  }
+  .cardbtn .chip::after{content:"";position:absolute;inset:4px 5px;border:1px solid rgba(120,80,0,.4);border-radius:2px}
+  .cardbtn .wave{
+    position:absolute;top:9px;right:12px;font-size:1rem;font-weight:800;
+    opacity:.9;transform:rotate(90deg);letter-spacing:-2px;
+  }
+  .cardbtn .nm{font-size:.92rem;font-weight:800;letter-spacing:-.01em;text-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .cardbtn .brand{
+    position:absolute;bottom:11px;right:13px;font-size:.6rem;font-weight:800;
+    font-style:italic;opacity:.85;letter-spacing:.03em;
+  }
+  .cardbtn.sel{outline-color:var(--accent);transform:scale(1.03)}
+  .cardbtn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none}
+  .cardbtn.cash{
+    grid-column:1/-1;min-height:62px;flex-direction:row;align-items:center;gap:10px;
+    color:#6b5310;background:linear-gradient(135deg,#f2e6c4,#e0cd99);
+    box-shadow:inset 0 0 0 2px rgba(107,83,16,.22), 0 2px 6px rgba(20,30,50,.1);
+  }
+  .cardbtn.cash .nm{text-shadow:none}
+  .cardbtn.cash .yen{
+    width:34px;height:34px;border-radius:50%;flex:none;
+    border:2px solid rgba(107,83,16,.4);display:flex;align-items:center;justify-content:center;
+    font-size:1.15rem;font-weight:800;
+  }
+
+  /* ── 실시간 혜택 미리보기 ── */
+  #preview{
+    margin-top:2px;display:none;
+    background:#f7f8fa;border:1px solid var(--line);border-radius:11px;padding:10px 12px;
+  }
+  #preview.show{display:block}
+  .pv-row{display:flex;justify-content:space-between;align-items:center;padding:5px 2px;font-size:.9rem}
+  .pv-row .pv-name{display:flex;align-items:center;gap:7px;color:var(--ink)}
+  .pv-row .pv-name i{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .pv-val{font-weight:700}
+  .pv-val.plus{color:var(--good)} .pv-val.minus{color:var(--bad)} .pv-val.zero{color:var(--ink-soft)}
+  #bestBar{
+    margin-top:8px;border-radius:10px;padding:10px 12px;font-size:.9rem;font-weight:700;
+    background:#fff6ec;color:#8a4b00;border:1px solid #f2ddc2;line-height:1.45;
+  }
+  #bestBar b{color:var(--accent)}
+
+  /* ── 기록 버튼 ── */
+  #btnSave{
+    width:100%;margin-top:14px;padding:16px 0;border:0;border-radius:13px;
+    background:var(--accent);color:#fff;font-size:1.12rem;font-weight:800;letter-spacing:.02em;cursor:pointer;
+  }
+  #btnSave:active{filter:brightness(.92)}
+  #btnSave:disabled{background:#d4d9e1;cursor:not-allowed}
+
+  /* ── 현황 게이지 ── */
+  .gauge{margin-bottom:14px}
+  .gauge:last-child{margin-bottom:0}
+  .g-head{display:flex;justify-content:space-between;font-size:.86rem;margin-bottom:5px}
+  .g-head .g-name{font-weight:700;display:flex;align-items:center;gap:6px}
+  .g-head .g-name i{width:9px;height:9px;border-radius:3px;display:inline-block}
+  .g-head .g-val{color:var(--ink-soft);font-weight:600}
+  .bar{height:9px;border-radius:5px;background:#eceff3;overflow:hidden}
+  .bar>div{height:100%;border-radius:5px;background:var(--good);transition:width .3s}
+  .bar>div.warn{background:var(--warn)} .bar>div.over{background:var(--bad)}
+  .g-sub{font-size:.76rem;color:var(--ink-soft);margin-top:4px}
+
+  /* ── 현금 지갑 ── */
+  .wallet{display:flex;align-items:baseline;justify-content:space-between}
+  .wallet .amt{font-size:1.7rem;font-weight:800}
+  .wallet .amt.low{color:var(--bad)}
+  .wallet .lbl{font-size:.8rem;color:var(--ink-soft)}
+  .wallet-stats{display:flex;gap:14px;margin-top:8px;font-size:.8rem;color:var(--ink-soft)}
+
+  /* ── 요약 ── */
+  .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sumbox{background:#f7f8fa;border-radius:10px;padding:11px 12px}
+  .sumbox .k{font-size:.74rem;color:var(--ink-soft);margin-bottom:3px}
+  .sumbox .v{font-size:1.05rem;font-weight:800}
+  .sumbox .v.plus{color:var(--good)}
+
+  /* ── 내역 ── */
+  .day-label{font-size:.76rem;font-weight:700;color:var(--ink-soft);margin:12px 0 6px}
+  .entry{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #f0f2f5}
+  .entry:last-child{border-bottom:0}
+  .entry i{width:10px;height:10px;border-radius:3px;flex:none}
+  .e-main{flex:1;min-width:0}
+  .e-top{font-size:.9rem;font-weight:700;display:flex;gap:6px;align-items:baseline}
+  .e-top .tag{font-size:.68rem;font-weight:700;padding:1px 6px;border-radius:5px;background:#eef1f5;color:var(--ink-soft)}
+  .e-sub{font-size:.76rem;color:var(--ink-soft);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .e-amt{font-weight:800;font-size:.95rem;white-space:nowrap}
+  .e-ben{font-size:.72rem;text-align:right;color:var(--good);font-weight:700}
+  .e-ben.minus{color:var(--bad)}
+  .e-del{border:0;background:none;color:#c4cad4;font-size:1.05rem;padding:4px 6px;cursor:pointer}
+  .empty{text-align:center;color:var(--ink-soft);font-size:.85rem;padding:18px 0}
+
+  /* ── 설정 ── */
+  #settings{display:none}
+  #settings.show{display:block}
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f0f2f5}
+  .set-row:last-child{border-bottom:0}
+  .set-row label{font-size:.88rem;font-weight:600}
+  .set-row small{display:block;font-weight:400;color:var(--ink-soft);font-size:.74rem;margin-top:1px}
+  .set-row input{
+    width:110px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;
+    font-size:.95rem;font-weight:700;text-align:right;background:#fff;color:var(--ink);
+  }
+  .set-actions{display:flex;gap:8px;margin-top:12px}
+  .set-actions button{flex:1;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:#f7f8fa;font-weight:700;font-size:.86rem;cursor:pointer;color:var(--ink)}
+  .set-actions .danger{color:var(--bad);background:#fdf1ef;border-color:#f3d5d0}
+
+  /* ── 토스트 ── */
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 20px;border-radius:12px;
+    font-size:.9rem;font-weight:700;opacity:0;pointer-events:none;transition:all .25s;
+    max-width:90%;text-align:center;z-index:99;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>일본 카드 트래커 <span class="jp">¥</span></h1>
+  <button id="btnSettings" type="button">⚙ 설정</button>
+</header>
+
+<!-- 설정 -->
+<section id="settings">
+  <div class="sec-title">설정</div>
+  <div class="set-row">
+    <label>실시간 환율 자동 입력<small id="rateInfo">아직 불러온 적 없음</small></label>
+    <button type="button" id="btnFetchRate" style="padding:9px 14px;border:1px solid var(--line);border-radius:9px;background:#eef4ff;color:#0050d4;font-weight:700;font-size:.85rem;cursor:pointer;flex:none">지금 불러오기</button>
+  </div>
+  <div class="set-row">
+    <label>환율 USD → JPY<small>달러 기준 한도 계산용 (예: 155)</small></label>
+    <input id="setUsdJpy" type="number" inputmode="decimal" step="0.1">
+  </div>
+  <div class="set-row">
+    <label>환율 JPY 100엔 → KRW<small>원화 환산 표시용 (예: 920)</small></label>
+    <input id="setJpyKrw" type="number" inputmode="decimal" step="1">
+  </div>
+  <div class="set-row">
+    <label>보유 현금 초기값 (¥)<small>한국에서 미리 환전해 온 엔화</small></label>
+    <input id="setCashInit" type="number" inputmode="numeric" step="100">
+  </div>
+  <div class="set-actions">
+    <button type="button" id="btnSetSave">설정 저장</button>
+    <button type="button" id="btnReset" class="danger">전체 기록 초기화</button>
+  </div>
+</section>
+
+<!-- 입력 -->
+<section>
+  <div class="sec-title">빠른 입력</div>
+  <div class="amount-row">
+    <span class="yen-mark">¥</span>
+    <input id="amount" type="text" inputmode="numeric" placeholder="0" autocomplete="off">
+  </div>
+  <div id="krwHint" class="num"></div>
+  <div class="chips">
+    <button type="button" data-add="500">+500</button>
+    <button type="button" data-add="1000">+1천</button>
+    <button type="button" data-add="5000">+5천</button>
+    <button type="button" data-add="10000">+1만</button>
+    <button type="button" class="clear" data-add="0">C</button>
+  </div>
+
+  <div class="seg" role="tablist">
+    <button type="button" id="segPay" class="on">💳 결제</button>
+    <button type="button" id="segAtm">🏧 ATM 인출</button>
+  </div>
+
+  <div id="preview"></div>
+
+  <div class="cards" id="cardBtns">
+    <button type="button" class="cardbtn tlog" data-card="tlog">
+      <span class="chip"></span><span class="wave">)))</span>
+      <span class="nm">트래블로그</span><span class="brand">mastercard</span>
+    </button>
+    <button type="button" class="cardbtn twallet" data-card="twallet">
+      <span class="chip"></span><span class="wave">)))</span>
+      <span class="nm">travel wallet</span><span class="brand">VISA</span>
+    </button>
+    <button type="button" class="cardbtn toss" data-card="toss">
+      <span class="chip"></span><span class="wave">)))</span>
+      <span class="nm">toss bank</span><span class="brand">mastercard</span>
+    </button>
+    <button type="button" class="cardbtn naver" data-card="naver">
+      <span class="chip"></span><span class="wave">)))</span>
+      <span class="nm">N Pay 머니카드</span><span class="brand">VISA</span>
+    </button>
+    <button type="button" class="cardbtn nh" data-card="nh">
+      <span class="chip"></span><span class="wave">)))</span>
+      <span class="nm">NH 일본여행중</span><span class="brand">JCB</span>
+    </button>
+    <button type="button" class="cardbtn cash" data-card="cash">
+      <span class="yen">¥</span>
+      <span class="nm">현금으로 지불</span>
+    </button>
+  </div>
+
+  <button id="btnSave" type="button" disabled>기록하기</button>
+</section>
+
+<!-- 현금 지갑 -->
+<section>
+  <div class="sec-title">💴 현금 지갑</div>
+  <div class="wallet">
+    <div><div class="lbl">지금 갖고 있는 현금</div><div class="amt num" id="cashNow">¥0</div></div>
+    <div style="text-align:right"><div class="lbl">원화 환산</div><div class="num" id="cashKrw" style="font-weight:700;color:var(--ink-soft)">₩0</div></div>
+  </div>
+  <div class="wallet-stats num">
+    <span>인출 누계 <b id="cashIn">¥0</b></span>
+    <span>현금 지출 누계 <b id="cashOut">¥0</b></span>
+  </div>
+</section>
+
+<!-- 한도 현황 -->
+<section>
+  <div class="sec-title">이번 달 혜택 한도 현황</div>
+
+  <div class="gauge">
+    <div class="g-head">
+      <span class="g-name"><i style="background:var(--c-toss)"></i>토스뱅크 ATM 무료 횟수</span>
+      <span class="g-val num" id="tossCntVal">0 / 5회</span>
+    </div>
+    <div class="bar"><div id="tossCntBar" style="width:0%"></div></div>
+  </div>
+
+  <div class="gauge">
+    <div class="g-head">
+      <span class="g-name"><i style="background:var(--c-toss)"></i>토스뱅크 ATM 무료 금액</span>
+      <span class="g-val num" id="tossAmtVal">$0 / $700</span>
+    </div>
+    <div class="bar"><div id="tossAmtBar" style="width:0%"></div></div>
+    <div class="g-sub">횟수·금액 중 하나라도 초과하면 인출액의 1% + $3 수수료</div>
+  </div>
+
+  <div class="gauge">
+    <div class="g-head">
+      <span class="g-name"><i style="background:var(--c-twallet)"></i>트래블월렛 ATM 무료 금액</span>
+      <span class="g-val num" id="twAmtVal">$0 / $500</span>
+    </div>
+    <div class="bar"><div id="twAmtBar" style="width:0%"></div></div>
+    <div class="g-sub">월 $500 초과분부터 2% 수수료 · 기기수수료 무료는 이온뱅크 ATM만</div>
+  </div>
+
+  <div class="gauge">
+    <div class="g-head">
+      <span class="g-name"><i style="background:var(--c-tlog)"></i>트래블로그 ATM</span>
+      <span class="g-val">횟수 제한 없음</span>
+    </div>
+    <div class="g-sub">세븐일레븐(세븐뱅크) ATM에서 기기수수료 무료 · 월 $10,000 한도</div>
+  </div>
+
+  <div class="gauge">
+    <div class="g-head">
+      <span class="g-name"><i style="background:var(--c-nh)"></i>NH 일본여행중 적립 (올해)</span>
+      <span class="g-val num" id="nhPtVal">0 / 100,000P</span>
+    </div>
+    <div class="bar"><div id="nhPtBar" style="width:0%"></div></div>
+    <div class="g-sub">일본 오프라인 10% 적립 · 연 10만 포인트 한도 (결제 약 100만원어치) · 전월실적 30만원 이상</div>
+  </div>
+</section>
+
+<!-- 여행 요약 -->
+<section>
+  <div class="sec-title">여행 요약</div>
+  <div class="sumgrid">
+    <div class="sumbox"><div class="k">총 지출 (현금 포함)</div><div class="v num" id="sumTotal">¥0</div></div>
+    <div class="sumbox"><div class="k">받은 혜택 (캐시백+적립)</div><div class="v num plus" id="sumBenefit">+¥0</div></div>
+  </div>
+</section>
+
+<!-- 기록 내역 -->
+<section>
+  <div class="sec-title">기록 내역</div>
+  <div id="history"><div class="empty">아직 기록이 없어요. 첫 결제를 입력해 보세요!</div></div>
+</section>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var LS_KEY = "jpCardTracker_v1";
+
+  var CARDS = {
+    tlog:    {name:"트래블로그",  color:"var(--c-tlog)",   atm:true },
+    twallet: {name:"트래블월렛", color:"var(--c-twallet)", atm:true },
+    toss:    {name:"토스뱅크",   color:"var(--c-toss)",   atm:true },
+    naver:   {name:"네이버페이", color:"var(--c-naver)",  atm:false},
+    nh:      {name:"NH일본여행중",color:"var(--c-nh)",    atm:false},
+    cash:    {name:"현금",       color:"var(--c-cash)",   atm:false}
+  };
+
+  var state = load();
+  function load(){
+    try{
+      var d = JSON.parse(localStorage.getItem(LS_KEY));
+      if(d && Array.isArray(d.entries)) return d;
+    }catch(e){}
+    return { entries:[], usdJpy:155, jpyKrw100:920, cashInit:0 };
+  }
+  function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
+
+  /* ── 유틸 ── */
+  function $(id){ return document.getElementById(id); }
+  function fmt(n){ return Math.round(n).toLocaleString("ko-KR"); }
+  function yen(n){ return "¥" + fmt(n); }
+  function krw(nYen){ return "₩" + fmt(nYen * state.jpyKrw100 / 100); }
+  function usd(nYen){ return nYen / state.usdJpy; }
+  function sameMonth(ts){
+    var d = new Date(ts), n = new Date();
+    return d.getFullYear()===n.getFullYear() && d.getMonth()===n.getMonth();
+  }
+  function toast(msg){
+    var t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(t._tm); t._tm = setTimeout(function(){ t.classList.remove("show"); }, 2200);
+  }
+
+  /* ── 이번 달 ATM 누계 ── */
+  function atmStats(card){
+    var cnt=0, sumYen=0;
+    state.entries.forEach(function(e){
+      if(e.type==="atm" && e.card===card && sameMonth(e.ts)){ cnt++; sumYen+=e.amt; }
+    });
+    return {cnt:cnt, usd:usd(sumYen)};
+  }
+
+  /* ── NH 일본여행중: 올해 적립한 NH포인트 누계 (연 10만P 한도) ── */
+  var NH_YEAR_CAP = 100000;   // 연간 10만 포인트
+  function nhPointsUsed(){
+    var yr = new Date().getFullYear(), sum = 0;
+    state.entries.forEach(function(e){
+      if(e.card==="nh" && e.type==="pay" && new Date(e.ts).getFullYear()===yr){
+        sum += e.amt * state.jpyKrw100 / 100 * 0.10;
+      }
+    });
+    return sum;
+  }
+
+  /* ── 혜택 계산 (엔화 기준, 양수=이득 / 음수=수수료 손해) ──
+     계산 근거(2026.7 기준):
+     · 토스뱅크 결제: 2% 캐시백 − (국제브랜드 1% + 건당 $0.5) → 순이익 = 1%·금액 − $0.5
+     · 네이버페이 결제: 2% 포인트 적립 (+수수료 1.1%+$0.5는 2026.12.31까지 포인트 환급 → 순 +2%)
+     · 트래블로그/트래블월렛 결제: 수수료 0, 캐시백 없음 → 순 0
+     · 토스 ATM: 월 5회·$700까지 무료, 초과 시 1%+$3
+     · 트래블월렛 ATM: 월 $500까지 무료, 초과분 2% (기기수수료는 이온뱅크만 무료)
+     · 트래블로그 ATM: 세븐뱅크 무료, 횟수 제한 없음                         */
+  function calcBenefit(card, type, amtYen){
+    var r = {net:0, note:""};
+    var halfUsd = 0.5 * state.usdJpy;
+    if(type === "pay"){
+      if(card==="nh"){
+        var usedP  = nhPointsUsed();
+        var krwAmt = amtYen * state.jpyKrw100 / 100;
+        var pts    = Math.min(krwAmt*0.10, Math.max(0, NH_YEAR_CAP - usedP));
+        r.net = pts * 100 / state.jpyKrw100;          // 포인트(원) → 엔 환산
+        r.note = pts <= 0
+          ? "연간 10만P 한도를 다 썼어요"
+          : (pts < krwAmt*0.10
+              ? "10% 적립 · 연간 한도가 거의 찼어요"
+              : "일본 오프라인 10% 적립 (전월실적 30만원 필요)");
+      } else if(card==="toss"){
+        r.net = amtYen*0.01 - halfUsd;
+        r.note = r.net >= 0 ? "캐시백 2% − 수수료(1%+$0.5)" : "소액이라 수수료가 캐시백보다 커요";
+      } else if(card==="naver"){
+        r.net = amtYen*0.02;
+        r.note = "포인트 2% 적립 (수수료는 포인트로 환급)";
+      } else if(card==="tlog"){
+        r.note = "수수료 0 · 캐시백 없음";
+      } else if(card==="twallet"){
+        r.note = "수수료 0 · 캐시백 없음";
+      } else if(card==="cash"){
+        r.note = "현금 지갑에서 차감돼요";
+      }
+    } else { /* ATM */
+      if(card==="toss"){
+        var s = atmStats("toss");
+        var overCnt = s.cnt >= 5;
+        var overAmt = s.usd + usd(amtYen) > 700;
+        if(overCnt || overAmt){
+          var feeUsd;
+          if(overCnt){ feeUsd = usd(amtYen)*0.01 + 3; }
+          else {
+            var excess = Math.max(0, s.usd + usd(amtYen) - 700);
+            feeUsd = excess*0.01 + 3;
+          }
+          r.net = -feeUsd*state.usdJpy;
+          r.note = "무료 한도(5회/$700) 초과 — 수수료 발생";
+        } else {
+          r.note = "무료 (남은 횟수 " + (5-s.cnt-1) + "회 · 세븐뱅크 기기수수료도 무료)";
+        }
+      } else if(card==="twallet"){
+        var t = atmStats("twallet");
+        var excess2 = Math.max(0, (t.usd + usd(amtYen)) - 500);
+        if(excess2 > 0){
+          r.net = -(excess2*0.02)*state.usdJpy;
+          r.note = "월 $500 초과분 2% 수수료";
+        } else {
+          r.note = "무료 (이온뱅크 ATM 이용 시 · 잔여 $" + Math.round(500 - t.usd - usd(amtYen)) + ")";
+        }
+      } else if(card==="tlog"){
+        r.note = "세븐일레븐(세븐뱅크) ATM 무료 · 횟수 무제한";
+      }
+    }
+    return r;
+  }
+
+  /* ── 입력 상태 ── */
+  var curType = "pay";     // pay | atm
+  var curCard = null;
+  var curAmt  = 0;
+
+  var amountEl = $("amount");
+  amountEl.addEventListener("input", function(){
+    var digits = amountEl.value.replace(/[^\d]/g,"").slice(0,9);
+    curAmt = digits ? parseInt(digits,10) : 0;
+    amountEl.value = curAmt ? fmt(curAmt) : "";
+    refreshEntryUI();
+  });
+
+  document.querySelectorAll(".chips button").forEach(function(b){
+    b.addEventListener("click", function(){
+      var add = parseInt(b.dataset.add,10);
+      curAmt = add===0 ? 0 : curAmt + add;
+      amountEl.value = curAmt ? fmt(curAmt) : "";
+      refreshEntryUI();
+    });
+  });
+
+  $("segPay").addEventListener("click", function(){ setType("pay"); });
+  $("segAtm").addEventListener("click", function(){ setType("atm"); });
+  function setType(t){
+    curType = t;
+    $("segPay").classList.toggle("on", t==="pay");
+    $("segAtm").classList.toggle("on", t==="atm");
+    // ATM 불가 카드 처리
+    document.querySelectorAll(".cardbtn").forEach(function(b){
+      var c = b.dataset.card;
+      var disabled = (t==="atm") && !CARDS[c].atm;
+      b.disabled = disabled;
+      if(disabled && curCard===c){ curCard = null; b.classList.remove("sel"); }
+    });
+    refreshEntryUI();
+  }
+
+  document.querySelectorAll(".cardbtn").forEach(function(b){
+    b.addEventListener("click", function(){
+      if(b.disabled) return;
+      curCard = b.dataset.card;
+      document.querySelectorAll(".cardbtn").forEach(function(x){ x.classList.toggle("sel", x===b); });
+      refreshEntryUI();
+    });
+  });
+
+  /* ── 실시간 미리보기 + 추천 ── */
+  function refreshEntryUI(){
+    $("krwHint").textContent = curAmt ? "≈ " + krw(curAmt) : "";
+    var pv = $("preview");
+    if(!curAmt){
+      pv.classList.add("show");
+      pv.innerHTML = '<div style="font-size:.85rem;color:var(--ink-soft);text-align:center;padding:2px 0">금액을 입력하면 카드별 혜택을 비교해서 추천해 드려요</div>';
+      $("btnSave").disabled = true; return;
+    }
+    pv.classList.add("show");
+
+    var html = "";
+    var list = curType==="pay" ? ["nh","naver","toss","tlog","twallet"] : ["tlog","toss","twallet"];
+    var best = null;
+    list.forEach(function(c){
+      var r = calcBenefit(c, curType, curAmt);
+      var cls = r.net > 0.5 ? "plus" : (r.net < -0.5 ? "minus" : "zero");
+      var val = r.net > 0.5 ? "+"+yen(r.net) : (r.net < -0.5 ? "−"+yen(-r.net) : "±0");
+      html += '<div class="pv-row"><span class="pv-name"><i style="background:'+CARDS[c].color+'"></i>'+CARDS[c].name+'</span>'
+            + '<span class="pv-val num '+cls+'">'+val+'</span></div>';
+      if(best===null || r.net > best.net + 0.001) best = {card:c, net:r.net, note:r.note};
+    });
+
+    var bestTxt;
+    if(curType==="pay"){
+      bestTxt = best.net > 0.5
+        ? "이 금액엔 <b>"+CARDS[best.card].name+"</b>가 유리해요 (+"+yen(best.net)+" 예상)"
+        : "이 금액엔 캐시백 이득이 없어요. <b>트래블로그</b>나 <b>트래블월렛</b>(수수료 0)을 추천해요";
+    } else {
+      bestTxt = "인출은 <b>"+CARDS[best.card].name+"</b> 추천 — " + best.note;
+    }
+    html += '<div id="bestBar">'+bestTxt+'</div>';
+    pv.innerHTML = html;
+    $("btnSave").disabled = !(curAmt && curCard);
+  }
+
+  /* ── 기록 저장 ── */
+  $("btnSave").addEventListener("click", function(){
+    if(!curAmt || !curCard) return;
+    if(curCard==="cash"){
+      var have = cashBalance();
+      if(curAmt > have && !confirm("보유 현금("+yen(have)+")보다 큰 금액이에요. 그래도 기록할까요?")) return;
+    }
+    var r = calcBenefit(curCard, curType, curAmt);
+    state.entries.unshift({
+      ts: Date.now(),
+      card: curCard,
+      type: curCard==="cash" ? "pay" : curType,
+      amt: curAmt,
+      benefit: Math.round(r.net)
+    });
+    save();
+    toast((curType==="atm" && curCard!=="cash" ? "인출 " : "") + yen(curAmt) + " 기록 완료"
+          + (r.net>0.5 ? " · 혜택 +"+yen(r.net) : ""));
+    curAmt = 0; amountEl.value = "";
+    refreshEntryUI(); render();
+  });
+
+  /* ── 현금 계산 ── */
+  function cashBalance(){
+    var inSum = state.cashInit, outSum = 0;
+    state.entries.forEach(function(e){
+      if(e.type==="atm") inSum += e.amt;
+      if(e.card==="cash") outSum += e.amt;
+    });
+    return inSum - outSum;
+  }
+
+  /* ── 화면 렌더 ── */
+  function render(){
+    /* 현금 */
+    var inSum=0, outSum=0;
+    state.entries.forEach(function(e){
+      if(e.type==="atm") inSum += e.amt;
+      if(e.card==="cash") outSum += e.amt;
+    });
+    var bal = state.cashInit + inSum - outSum;
+    $("cashNow").textContent = yen(bal);
+    $("cashNow").classList.toggle("low", bal < 1000);
+    $("cashKrw").textContent = krw(bal);
+    $("cashIn").textContent = yen(state.cashInit + inSum);
+    $("cashOut").textContent = yen(outSum);
+
+    /* 토스 ATM 게이지 */
+    var ts = atmStats("toss");
+    $("tossCntVal").textContent = ts.cnt + " / 5회";
+    setBar("tossCntBar", ts.cnt/5);
+    $("tossAmtVal").textContent = "$" + Math.round(ts.usd) + " / $700";
+    setBar("tossAmtBar", ts.usd/700);
+
+    /* 트래블월렛 ATM 게이지 */
+    var tw = atmStats("twallet");
+    $("twAmtVal").textContent = "$" + Math.round(tw.usd) + " / $500";
+    setBar("twAmtBar", tw.usd/500);
+
+    /* NH 연간 적립 게이지 */
+    var nhP = nhPointsUsed();
+    $("nhPtVal").textContent = fmt(nhP) + " / " + fmt(NH_YEAR_CAP) + "P";
+    setBar("nhPtBar", nhP/NH_YEAR_CAP);
+
+    /* 요약 */
+    var total=0, ben=0;
+    state.entries.forEach(function(e){
+      if(e.type==="pay") total += e.amt;
+      ben += e.benefit;
+    });
+    $("sumTotal").textContent = yen(total);
+    $("sumBenefit").textContent = (ben>=0?"+":"−") + yen(Math.abs(ben));
+    $("sumBenefit").className = "v num " + (ben>=0 ? "plus" : "");
+
+    /* 내역 */
+    var h = $("history");
+    if(!state.entries.length){
+      h.innerHTML = '<div class="empty">아직 기록이 없어요. 첫 결제를 입력해 보세요!</div>';
+    } else {
+      var html = "", lastDay = "";
+      state.entries.forEach(function(e, idx){
+        var d = new Date(e.ts);
+        var day = (d.getMonth()+1) + "월 " + d.getDate() + "일";
+        if(day !== lastDay){ html += '<div class="day-label">'+day+'</div>'; lastDay = day; }
+        var hh = String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+        var tag = e.type==="atm" ? "인출" : (e.card==="cash" ? "현금" : "결제");
+        var benTxt = "";
+        if(e.benefit > 0) benTxt = '<div class="e-ben num">+'+yen(e.benefit)+'</div>';
+        else if(e.benefit < 0) benTxt = '<div class="e-ben minus num">−'+yen(-e.benefit)+'</div>';
+        html += '<div class="entry">'
+          + '<i style="background:'+CARDS[e.card].color+'"></i>'
+          + '<div class="e-main"><div class="e-top">'+CARDS[e.card].name+' <span class="tag">'+tag+'</span></div>'
+          + '<div class="e-sub num">'+hh+' · '+krw(e.amt)+'</div></div>'
+          + '<div><div class="e-amt num">'+(e.type==="atm"?"+":"")+yen(e.amt)+'</div>'+benTxt+'</div>'
+          + '<button class="e-del" data-i="'+idx+'" aria-label="삭제">✕</button>'
+          + '</div>';
+      });
+      h.innerHTML = html;
+      h.querySelectorAll(".e-del").forEach(function(b){
+        b.addEventListener("click", function(){
+          if(confirm("이 기록을 삭제할까요?")){
+            state.entries.splice(parseInt(b.dataset.i,10),1);
+            save(); render(); refreshEntryUI();
+          }
+        });
+      });
+    }
+  }
+  function setBar(id, ratio){
+    var el = $(id);
+    var pct = Math.min(100, ratio*100);
+    el.style.width = pct + "%";
+    el.className = ratio >= 1 ? "over" : (ratio >= 0.8 ? "warn" : "");
+  }
+
+  /* ── 설정 ── */
+  $("btnSettings").addEventListener("click", function(){
+    var s = $("settings");
+    s.classList.toggle("show");
+    if(s.classList.contains("show")){
+      $("setUsdJpy").value = state.usdJpy;
+      $("setJpyKrw").value = state.jpyKrw100;
+      $("setCashInit").value = state.cashInit;
+      rateInfoText();
+    }
+  });
+  $("btnSetSave").addEventListener("click", function(){
+    var a = parseFloat($("setUsdJpy").value), b = parseFloat($("setJpyKrw").value), c = parseFloat($("setCashInit").value);
+    if(a>0) state.usdJpy = a;
+    if(b>0) state.jpyKrw100 = b;
+    if(c>=0) state.cashInit = c;
+    save(); render(); refreshEntryUI();
+    $("settings").classList.remove("show");
+    toast("설정을 저장했어요");
+  });
+  $("btnReset").addEventListener("click", function(){
+    if(confirm("모든 기록을 삭제할까요? 되돌릴 수 없어요.")){
+      state.entries = []; save(); render(); refreshEntryUI();
+      toast("기록을 초기화했어요");
+    }
+  });
+
+  /* ── 실시간 환율 자동 입력 ──
+     open.er-api.com 무료 환율 API 사용 (키 불필요, 하루 1회 갱신 데이터)
+     오프라인이거나 실패하면 마지막 저장값을 그대로 사용                    */
+  function rateInfoText(){
+    var el = $("rateInfo");
+    if(!el) return;
+    if(state.rateUpdated){
+      var d = new Date(state.rateUpdated);
+      el.textContent = "마지막 갱신: " + (d.getMonth()+1) + "/" + d.getDate() + " "
+        + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0")
+        + " · $1=" + state.usdJpy.toFixed(1) + "엔, 100엔=" + Math.round(state.jpyKrw100) + "원";
+    } else {
+      el.textContent = "아직 불러온 적 없음 (아래 값 직접 입력 가능)";
+    }
+  }
+  function fetchRates(showToast){
+    if(!navigator.onLine){
+      if(showToast) toast("오프라인이에요. 저장된 환율을 사용합니다");
+      return;
+    }
+    fetch("https://open.er-api.com/v6/latest/USD")
+      .then(function(res){ if(!res.ok) throw new Error(); return res.json(); })
+      .then(function(d){
+        if(!d || !d.rates || !d.rates.JPY || !d.rates.KRW) throw new Error();
+        state.usdJpy = Math.round(d.rates.JPY * 100) / 100;
+        state.jpyKrw100 = Math.round(d.rates.KRW / d.rates.JPY * 100 * 10) / 10;
+        state.rateUpdated = Date.now();
+        save(); render(); refreshEntryUI(); rateInfoText();
+        var s = $("settings");
+        if(s.classList.contains("show")){
+          $("setUsdJpy").value = state.usdJpy;
+          $("setJpyKrw").value = state.jpyKrw100;
+        }
+        if(showToast) toast("환율 갱신 완료 · 100엔 = " + Math.round(state.jpyKrw100) + "원");
+      })
+      .catch(function(){
+        if(showToast) toast("환율을 불러오지 못했어요. 저장된 값을 사용합니다");
+      });
+  }
+  $("btnFetchRate").addEventListener("click", function(){ fetchRates(true); });
+  /* 앱 시작 시: 갱신한 지 12시간 지났으면 자동 갱신 */
+  if(!state.rateUpdated || Date.now() - state.rateUpdated > 12*60*60*1000){
+    fetchRates(false);
+  }
+
+  /* 시작 */
+  setType("pay");
+  render();
+})();
+</script>
+</body>
+</html>
