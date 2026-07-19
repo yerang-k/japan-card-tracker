@@ -224,6 +224,12 @@
   .set-actions button{flex:1;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:#f7f8fa;font-weight:700;font-size:.86rem;cursor:pointer;color:var(--ink)}
   .set-actions .danger{color:var(--bad);background:#fdf1ef;border-color:#f3d5d0}
 
+  /* ── 저작권 표시 ── */
+  .copyright{
+    text-align:center;font-size:.72rem;line-height:1.75;color:var(--ink-soft);
+    padding:4px 0 20px;word-break:keep-all;
+  }
+
   /* ── 토스트 ── */
   #toast{
     position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);
@@ -420,6 +426,12 @@
   <div class="sec-title">기록 내역</div>
   <div id="history"><div class="empty">아직 기록이 없어요. 첫 결제를 입력해 보세요!</div></div>
 </section>
+
+<footer class="copyright">
+  일본 카드 트래커 &copy; 2026 KIMYERANG.<br>
+  본 앱은 자유롭게 사용할 수 있으나, 저작자의 허락 없는<br>
+  복제·배포·수정은 금지합니다.
+</footer>
 
 <div id="toast"></div>
 
