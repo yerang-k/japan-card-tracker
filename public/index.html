@@ -131,6 +131,18 @@
   #onlineRow span{font-size:.88rem;font-weight:600}
   #onlineRow small{display:block;font-weight:400;color:var(--ink-soft);font-size:.74rem;margin-top:1px}
 
+  /* ── ATM 위치 선택 ── */
+  #atmPlace{display:none;margin:0 0 10px;padding:10px 11px;background:#f7f8fa;border:1px solid var(--line);border-radius:10px}
+  #atmPlace.show{display:block}
+  .ap-title{font-size:.86rem;font-weight:600;margin-bottom:8px}
+  .ap-title small{font-weight:400;color:var(--ink-soft);font-size:.74rem}
+  .ap-btns{display:flex;gap:8px}
+  .ap-btns button{
+    flex:1;padding:9px 0;border-radius:9px;border:1.5px solid var(--line);
+    background:#fff;font-size:.86rem;font-weight:700;color:var(--ink-soft);cursor:pointer;
+  }
+  .ap-btns button.on{border-color:var(--accent);color:var(--accent);background:#fff6f4}
+
   /* ── 실시간 혜택 미리보기 ── */
   #preview{
     margin-top:2px;display:none;
@@ -250,6 +262,15 @@
     <label>보유 현금 초기값 (¥)<small>한국에서 미리 환전해 온 엔화</small></label>
     <input id="setCashInit" type="number" inputmode="numeric" step="100">
   </div>
+  <div class="set-row">
+    <label>기록 백업<small>기록은 이 폰·이 브라우저에만 저장돼요. 가끔 파일로 저장해 두세요</small></label>
+  </div>
+  <div class="set-actions">
+    <button type="button" id="btnExport">📤 파일로 저장</button>
+    <button type="button" id="btnImport">📥 파일에서 불러오기</button>
+  </div>
+  <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+
   <div class="set-actions">
     <button type="button" id="btnSetSave">설정 저장</button>
     <button type="button" id="btnReset" class="danger">전체 기록 초기화</button>
@@ -281,6 +302,14 @@
     <input type="checkbox" id="chkOnline">
     <span>온라인 결제 <small>한국에서 미리 예매·예약한 건 (NH는 1.5% 적립)</small></span>
   </label>
+
+  <div id="atmPlace">
+    <div class="ap-title">어느 ATM인가요? <small>기기수수료가 달라져요</small></div>
+    <div class="ap-btns">
+      <button type="button" id="apSeven" class="on">세븐일레븐</button>
+      <button type="button" id="apAeon">이온몰·미니스톱</button>
+    </div>
+  </div>
 
   <div id="preview"></div>
 
@@ -354,7 +383,8 @@
       <span class="g-name"><i style="background:var(--c-tlog)"></i>트래블로그 ATM</span>
       <span class="g-val">횟수 제한 없음</span>
     </div>
-    <div class="g-sub">세븐일레븐(세븐뱅크) ATM에서 기기수수료 무료 · 월 $10,000 한도</div>
+    <div class="g-sub">세븐일레븐(세븐뱅크) ATM에서 기기수수료 무료 · 월 $10,000 한도<br>
+      기기수수료는 세븐은행 기준 평일 07~23시 ¥110, 야간·주말 ¥220 (트래블월렛은 이온몰·미니스톱에서만 면제)</div>
   </div>
 
   <div class="gauge">
@@ -470,6 +500,19 @@
     return sum;
   }
 
+  /* ── ATM 기기수수료 ──
+     세븐은행: 평일 07:00~23:00 ¥110, 야간·주말 ¥220
+     면제 조건은 카드 브랜드와 ATM 운영사의 제휴에 따라 갈린다.
+     · 트래블로그·토스뱅크(마스터카드) → 세븐은행에서 면제
+     · 트래블월렛(비자)              → 이온은행에서 면제                */
+  function machineFee(card){
+    var d = new Date(), day = d.getDay(), hh = d.getHours();
+    var daytime = (day >= 1 && day <= 5) && hh >= 7 && hh < 23;
+    var fee = daytime ? 110 : 220;
+    if(curAtmPlace === "seven") return (card === "twallet") ? fee : 0;
+    return (card === "twallet") ? 0 : fee;   // 이온은행
+  }
+
   /* ── 혜택 계산 (엔화 기준, 양수=이득 / 음수=수수료 손해) ──
      계산 근거(2026.7 기준):
      · 토스뱅크 결제: 2% 캐시백 − (국제브랜드 1% + 건당 $0.5) → 순이익 = 1%·금액 − $0.5
@@ -545,7 +588,13 @@
           r.note = "무료 (이온뱅크 ATM 이용 시 · 잔여 $" + Math.round(500 - t.usd - usd(amtYen)) + ")";
         }
       } else if(card==="tlog"){
-        r.note = "세븐일레븐(세븐뱅크) ATM 무료 · 횟수 무제한";
+        r.note = "인출 수수료 무료 · 횟수 무제한";
+      }
+      /* ATM 기기 자체가 떼가는 수수료 (카드 혜택과 별개) */
+      var mf = machineFee(card);
+      if(mf > 0){
+        r.net -= mf;
+        r.note += " · 기기수수료 ¥" + mf;
       }
     }
     return r;
@@ -556,11 +605,21 @@
   var curCard = null;
   var curAmt  = 0;
   var curOnline = false;   // 온라인 결제 여부 (NH 적립률이 달라짐)
+  var curAtmPlace = "seven";   // seven(세븐일레븐) | aeon(이온몰·미니스톱)
 
   $("chkOnline").addEventListener("change", function(){
     curOnline = this.checked;
     refreshEntryUI();
   });
+
+  function setAtmPlace(p){
+    curAtmPlace = p;
+    $("apSeven").classList.toggle("on", p==="seven");
+    $("apAeon").classList.toggle("on", p==="aeon");
+    refreshEntryUI();
+  }
+  $("apSeven").addEventListener("click", function(){ setAtmPlace("seven"); });
+  $("apAeon").addEventListener("click", function(){ setAtmPlace("aeon"); });
 
   var amountEl = $("amount");
   amountEl.addEventListener("input", function(){
@@ -586,6 +645,7 @@
     $("segPay").classList.toggle("on", t==="pay");
     $("segAtm").classList.toggle("on", t==="atm");
     $("onlineRow").style.display = (t==="pay") ? "flex" : "none";   // 인출엔 해당 없음
+    $("atmPlace").classList.toggle("show", t==="atm");              // 결제엔 해당 없음
     // ATM 불가 카드 처리
     document.querySelectorAll(".cardbtn").forEach(function(b){
       var c = b.dataset.card;
@@ -784,6 +844,46 @@
     $("settings").classList.remove("show");
     toast("설정을 저장했어요");
   });
+  /* ── 기록 내보내기 / 가져오기 ──
+     기록은 이 브라우저에만 있으므로, 폰을 바꾸거나 데이터를 지우면 사라진다.
+     파일로 빼두면 다른 기기에서도 이어서 쓸 수 있다.                      */
+  $("btnExport").addEventListener("click", function(){
+    try{
+      var blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "일본카드기록-" + new Date().toISOString().slice(0,10) + ".json";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast(state.entries.length + "건을 파일로 저장했어요");
+    }catch(e){ toast("파일로 저장하지 못했어요"); }
+  });
+
+  $("btnImport").addEventListener("click", function(){ $("fileImport").click(); });
+  $("fileImport").addEventListener("change", function(ev){
+    var f = ev.target.files && ev.target.files[0];
+    if(!f) return;
+    if(!confirm("불러오면 지금 기록이 모두 대체됩니다.\n계속할까요?")){ ev.target.value=""; return; }
+    var rd = new FileReader();
+    rd.onload = function(){
+      try{
+        var d = JSON.parse(rd.result);
+        if(!d || !Array.isArray(d.entries)) throw new Error("형식 오류");
+        state = d;
+        if(!(state.usdJpy > 0))    state.usdJpy = 155;
+        if(!(state.jpyKrw100 > 0)) state.jpyKrw100 = 920;
+        if(!(state.cashInit >= 0)) state.cashInit = 0;
+        save(); render(); refreshEntryUI();
+        $("settings").classList.remove("show");
+        toast(state.entries.length + "건을 불러왔어요");
+      }catch(e){ toast("이 파일은 읽을 수 없어요"); }
+      ev.target.value = "";
+    };
+    rd.onerror = function(){ toast("파일을 여는 데 실패했어요"); ev.target.value=""; };
+    rd.readAsText(f);
+  });
+
   $("btnReset").addEventListener("click", function(){
     if(confirm("모든 기록을 삭제할까요? 되돌릴 수 없어요.")){
       state.entries = []; save(); render(); refreshEntryUI();
