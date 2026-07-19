@@ -1,0 +1,9 @@
+# Cloudflare Workers 배포 설정
+# name 은 지금 쓰는 주소(winter-term-7a22.yeahskyr.workers.dev)의 이름이다.
+# 이 이름을 바꾸면 주소도 바뀌므로 그대로 둘 것.
+name = "winter-term-7a22"
+compatibility_date = "2026-07-01"
+
+# 빌드 과정 없이 public 폴더의 파일을 그대로 서빙한다.
+[assets]
+directory = "./public"

@@ -41,6 +41,13 @@
 - 네이버페이 QR은 Alipay+ 가맹점에서만 됩니다. 받지 않는 가게에서는 다음으로 유리한 카드를 쓰세요.
 - ATM 기기수수료(¥110~220)는 계산에 포함되어 있지 않습니다. 트래블월렛은 **이온뱅크 ATM**에서만 기기수수료가 면제됩니다.
 
+## 배포
+
+이 저장소는 Cloudflare Workers에 연결되어, `main` 브랜치에 올리면 자동으로 배포됩니다.
+
+- 앱 파일: `public/index.html` (이 파일만 배포됨)
+- 배포 설정: `wrangler.toml` — `name`이 주소를 결정하므로 바꾸지 마세요
+
 ## 사용 기술
 
 의존성 없는 단일 HTML 파일입니다. 바닐라 JavaScript, `localStorage`, [open.er-api.com](https://open.er-api.com) 무료 환율 API(키 불필요).
