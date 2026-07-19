@@ -122,6 +122,15 @@
   }
   .cardbtn.naverqr .sub{display:block;font-size:.7rem;font-weight:600;opacity:.92;margin-top:1px}
 
+  /* ── 온라인 결제 체크 ── */
+  #onlineRow{
+    display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:9px 11px;
+    background:#f7f8fa;border:1px solid var(--line);border-radius:10px;cursor:pointer;
+  }
+  #onlineRow input{width:18px;height:18px;flex:none;accent-color:var(--accent)}
+  #onlineRow span{font-size:.88rem;font-weight:600}
+  #onlineRow small{display:block;font-weight:400;color:var(--ink-soft);font-size:.74rem;margin-top:1px}
+
   /* ── 실시간 혜택 미리보기 ── */
   #preview{
     margin-top:2px;display:none;
@@ -268,6 +277,11 @@
     <button type="button" id="segAtm">🏧 ATM 인출</button>
   </div>
 
+  <label id="onlineRow">
+    <input type="checkbox" id="chkOnline">
+    <span>온라인 결제 <small>한국에서 미리 예매·예약한 건 (NH는 1.5% 적립)</small></span>
+  </label>
+
   <div id="preview"></div>
 
   <div class="cards" id="cardBtns">
@@ -345,11 +359,20 @@
 
   <div class="gauge">
     <div class="g-head">
-      <span class="g-name"><i style="background:var(--c-nh)"></i>NH 일본여행중 적립 (올해)</span>
+      <span class="g-name"><i style="background:var(--c-nh)"></i>NH 오프라인 10% 적립 (올해)</span>
       <span class="g-val num" id="nhPtVal">0 / 100,000P</span>
     </div>
     <div class="bar"><div id="nhPtBar" style="width:0%"></div></div>
-    <div class="g-sub">일본 오프라인 10% 적립 · 연 10만 포인트 한도 (결제 약 100만원어치) · 전월실적 30만원 이상</div>
+    <div class="g-sub">일본 매장에서 직접 결제한 건 · 연 10만 포인트 한도 (결제 약 100만원어치)</div>
+  </div>
+
+  <div class="gauge">
+    <div class="g-head">
+      <span class="g-name"><i style="background:var(--c-nh)"></i>NH 온라인 1.5% 적립 (이번 달)</span>
+      <span class="g-val num" id="nhOnVal">0 / 30,000P</span>
+    </div>
+    <div class="bar"><div id="nhOnBar" style="width:0%"></div></div>
+    <div class="g-sub">한국에서 미리 예매·예약한 건 · 건당 1만원 이상 · 월 3만 포인트 한도</div>
   </div>
 </section>
 
@@ -419,13 +442,29 @@
     return {cnt:cnt, usd:usd(sumYen)};
   }
 
-  /* ── NH 일본여행중: 올해 적립한 NH포인트 누계 (연 10만P 한도) ── */
-  var NH_YEAR_CAP = 100000;
-  function nhPointsUsed(){
+  /* ── NH 일본여행중 적립 한도 ──
+     · 일본 "오프라인" 매장 10%  : 연간 10만 포인트
+     · 그 밖의 해외(온라인 포함) 1.5% : 건당 1만원 이상, 월 통합 3만 포인트
+     (예전에 저장된 기록은 online 값이 없으므로 오프라인으로 본다)        */
+  var NH_YEAR_CAP   = 100000;  // 오프라인 10% 연간 한도
+  var NH_MONTH_CAP  = 30000;   // 온라인 1.5% 월 한도
+  var NH_ONLINE_MIN = 10000;   // 온라인 적립 최소 결제액(원)
+
+  function nhOfflineUsed(){   // 올해 오프라인 적립 누계
     var yr = new Date().getFullYear(), sum = 0;
     state.entries.forEach(function(e){
-      if(e.card==="nh" && e.type==="pay" && new Date(e.ts).getFullYear()===yr){
+      if(e.card==="nh" && e.type==="pay" && !e.online && new Date(e.ts).getFullYear()===yr){
         sum += e.amt * state.jpyKrw100 / 100 * 0.10;
+      }
+    });
+    return sum;
+  }
+  function nhOnlineUsed(){    // 이번 달 온라인 적립 누계
+    var sum = 0;
+    state.entries.forEach(function(e){
+      if(e.card==="nh" && e.type==="pay" && e.online && sameMonth(e.ts)){
+        var k = e.amt * state.jpyKrw100 / 100;
+        if(k >= NH_ONLINE_MIN) sum += k * 0.015;
       }
     });
     return sum;
@@ -439,20 +478,31 @@
      · 토스 ATM: 월 5회·$700까지 무료, 초과 시 1%+$3
      · 트래블월렛 ATM: 월 $500까지 무료, 초과분 2% (기기수수료는 이온뱅크만 무료)
      · 트래블로그 ATM: 세븐뱅크 무료, 횟수 제한 없음                         */
-  function calcBenefit(card, type, amtYen){
+  function calcBenefit(card, type, amtYen, isOnline){
     var r = {net:0, note:""};
     var halfUsd = 0.5 * state.usdJpy;
     if(type === "pay"){
       if(card==="nh"){
-        var usedP  = nhPointsUsed();
-        var krwAmt = amtYen * state.jpyKrw100 / 100;
-        var pts    = Math.min(krwAmt*0.10, Math.max(0, NH_YEAR_CAP - usedP));
+        var krwAmt = amtYen * state.jpyKrw100 / 100, pts;
+        if(isOnline){
+          if(krwAmt < NH_ONLINE_MIN){
+            pts = 0;
+            r.note = "온라인은 건당 1만원 이상부터 적립돼요";
+          } else {
+            pts = Math.min(krwAmt*0.015, Math.max(0, NH_MONTH_CAP - nhOnlineUsed()));
+            r.note = pts <= 0
+              ? "이번 달 온라인 적립 3만P 한도를 다 썼어요"
+              : "온라인 1.5% 적립 (월 3만P 한도)";
+          }
+        } else {
+          pts = Math.min(krwAmt*0.10, Math.max(0, NH_YEAR_CAP - nhOfflineUsed()));
+          r.note = pts <= 0
+            ? "연간 10만P 한도를 다 썼어요"
+            : (pts < krwAmt*0.10
+                ? "10% 적립 · 연간 한도가 거의 찼어요"
+                : "일본 오프라인 10% 적립");
+        }
         r.net = pts * 100 / state.jpyKrw100;          // 포인트(원) → 엔 환산
-        r.note = pts <= 0
-          ? "연간 10만P 한도를 다 썼어요"
-          : (pts < krwAmt*0.10
-              ? "10% 적립 · 연간 한도가 거의 찼어요"
-              : "일본 오프라인 10% 적립 (전월실적 30만원 필요)");
       } else if(card==="toss"){
         r.net = amtYen*0.01 - halfUsd;
         r.note = r.net >= 0 ? "캐시백 2% − 수수료(1%+$0.5)" : "소액이라 수수료가 캐시백보다 커요";
@@ -505,6 +555,12 @@
   var curType = "pay";     // pay | atm
   var curCard = null;
   var curAmt  = 0;
+  var curOnline = false;   // 온라인 결제 여부 (NH 적립률이 달라짐)
+
+  $("chkOnline").addEventListener("change", function(){
+    curOnline = this.checked;
+    refreshEntryUI();
+  });
 
   var amountEl = $("amount");
   amountEl.addEventListener("input", function(){
@@ -529,6 +585,7 @@
     curType = t;
     $("segPay").classList.toggle("on", t==="pay");
     $("segAtm").classList.toggle("on", t==="atm");
+    $("onlineRow").style.display = (t==="pay") ? "flex" : "none";   // 인출엔 해당 없음
     // ATM 불가 카드 처리
     document.querySelectorAll(".cardbtn").forEach(function(b){
       var c = b.dataset.card;
@@ -563,7 +620,7 @@
     var list = curType==="pay" ? ["nh","naver","toss","tlog","twallet"] : ["tlog","toss","twallet"];
     var best = null;
     list.forEach(function(c){
-      var r = calcBenefit(c, curType, curAmt);
+      var r = calcBenefit(c, curType, curAmt, curOnline);
       var cls = r.net > 0.5 ? "plus" : (r.net < -0.5 ? "minus" : "zero");
       var val = r.net > 0.5 ? "+"+yen(r.net) : (r.net < -0.5 ? "−"+yen(-r.net) : "±0");
       html += '<div class="pv-row"><span class="pv-name"><i style="background:'+CARDS[c].color+'"></i>'+CARDS[c].name+'</span>'
@@ -595,12 +652,13 @@
       var have = cashBalance();
       if(curAmt > have && !confirm("보유 현금("+yen(have)+")보다 큰 금액이에요. 그래도 기록할까요?")) return;
     }
-    var r = calcBenefit(curCard, curType, curAmt);
+    var r = calcBenefit(curCard, curType, curAmt, curOnline);
     state.entries.unshift({
       ts: Date.now(),
       card: curCard,
       type: curCard==="cash" ? "pay" : curType,
       amt: curAmt,
+      online: (curType==="pay" && curOnline),
       benefit: Math.round(r.net)
     });
     save();
@@ -647,10 +705,13 @@
     $("twAmtVal").textContent = "$" + Math.round(tw.usd) + " / $500";
     setBar("twAmtBar", tw.usd/500);
 
-    /* NH 연간 적립 게이지 */
-    var nhP = nhPointsUsed();
-    $("nhPtVal").textContent = fmt(nhP) + " / " + fmt(NH_YEAR_CAP) + "P";
-    setBar("nhPtBar", nhP/NH_YEAR_CAP);
+    /* NH 적립 게이지 (오프라인 연간 / 온라인 월간) */
+    var nhOff = nhOfflineUsed();
+    $("nhPtVal").textContent = fmt(nhOff) + " / " + fmt(NH_YEAR_CAP) + "P";
+    setBar("nhPtBar", nhOff/NH_YEAR_CAP);
+    var nhOn = nhOnlineUsed();
+    $("nhOnVal").textContent = fmt(nhOn) + " / " + fmt(NH_MONTH_CAP) + "P";
+    setBar("nhOnBar", nhOn/NH_MONTH_CAP);
 
     /* 요약 */
     var total=0, ben=0;
